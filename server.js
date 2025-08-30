@@ -1,4 +1,3 @@
-// Import required packages
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,65 +7,51 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-// Create Express application
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security middleware
-app.use(helmet()); // Adds various HTTP headers for security
-app.use(compression()); // Compresses response bodies
+app.use(helmet());
+app.use(compression());
 
-// Rate limiting to prevent abuse
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-  },
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use('/api/', limiter);
 
-// CORS configuration - allows frontend to communicate with backend
+// CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? [process.env.FRONTEND_URL] 
-    : ['http://localhost:3000', 'https://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+    : ['http://localhost:3000'],
+  credentials: true
 }));
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(express.json({ limit: '10mb' }));
 
-// Logging middleware (logs all requests in development)
+// Logging middleware
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Database connection
+// MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => {
-  console.log('✅ Connected to MongoDB successfully');
+  console.log('✅ Connected to MongoDB Atlas successfully');
 })
 .catch((error) => {
   console.error('❌ MongoDB connection error:', error);
-  process.exit(1); // Exit if database connection fails
+  process.exit(1);
 });
 
-// Import routes
-const authRoutes = require('./routes/auth');
-const transactionRoutes = require('./routes/transactions');
-const aiRoutes = require('./routes/ai');
-
-// Use routes
-app.use('/api/auth', authRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/ai', aiRoutes);
+// Routes (you'll add these files later)
+// app.use('/api/auth', require('./routes/auth'));
+// app.use('/api/transactions', require('./routes/transactions'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -83,15 +68,14 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'AI Finance Assistant API',
     version: '1.0.0',
-    documentation: '/api/docs'
+    status: 'Running'
   });
 });
 
-// Error handling middleware (must be last)
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
   
-  // Don't expose error details in production
   const message = process.env.NODE_ENV === 'production' 
     ? 'Something went wrong!' 
     : err.message;
@@ -102,7 +86,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle 404 - Route not found
+// Handle 404
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Route not found',
@@ -113,14 +97,4 @@ app.use('*', (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-  console.log(`📡 API available at: http://localhost:${PORT}`);
-});
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    mongoose.connection.close();
-  });
 });
